@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+TestResults/
+coverage/
+.env
+appsettings.Local.json
+*.pfx
+*.p8
