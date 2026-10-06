@@ -1,0 +1,4 @@
+.connection-badge { display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:999px; font:500 8px/1 var(--mono); text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+.connection-badge i { width:5px; height:5px; border-radius:50%; }
+.connection-badge.connected { color:var(--green); background:#eaf4ee; }.connection-badge.connected i { background:var(--green); }
+.connection-badge.missing { color:var(--amber); background:#fff3db; }.connection-badge.missing i { background:var(--amber); }

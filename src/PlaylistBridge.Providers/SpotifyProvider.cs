@@ -69,7 +69,7 @@ public sealed class SpotifyProvider : IMusicProvider
     private async Task<JsonDocument> GetJsonAsync(string pathOrUrl, CancellationToken cancellationToken)
     {
         using var response = await _http.GetAsync(pathOrUrl, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        await ProviderHttp.EnsureSuccessAsync(response, Name, "read playlist data", cancellationToken);
         return JsonDocument.Parse(await response.Content.ReadAsStreamAsync(cancellationToken));
     }
 }

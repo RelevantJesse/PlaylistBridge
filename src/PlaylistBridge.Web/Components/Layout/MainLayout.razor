@@ -1,0 +1,27 @@
+@inherits LayoutComponentBase
+
+<div class="site-shell">
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="PlaylistBridge home">
+            <span class="brand-mark"><i></i><i></i><i></i></span>
+            <span>Playlist<span>Bridge</span></span>
+        </a>
+        <nav class="header-nav" aria-label="Primary navigation">
+            <NavLink href="/" Match="NavLinkMatch.All">Transfer</NavLink>
+            <NavLink href="connections">Connections</NavLink>
+        </nav>
+    </header>
+
+    @Body
+
+    <footer class="site-footer">
+        <span>PlaylistBridge</span>
+        <span>Move the music. Keep the memories.</span>
+    </footer>
+</div>
+
+<div id="blazor-error-ui">
+    Something went wrong.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">×</a>
+</div>

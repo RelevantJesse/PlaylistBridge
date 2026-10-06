@@ -1,0 +1,226 @@
+@page "/connections"
+@rendermode InteractiveServer
+@inject ServiceCredentialStore Credentials
+@inject PlaylistTransferFacade TransferFacade
+
+<PageTitle>Connections · PlaylistBridge</PageTitle>
+
+<section class="settings-hero">
+    <div class="eyebrow"><span></span> Account setup</div>
+    <h1>Connect your music.</h1>
+    <p>Add credentials for each service once. PlaylistBridge encrypts saved connections for your Windows user and restores them when the app restarts.</p>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(SpotifyStatus))
+{
+    <div class="oauth-status @(SpotifyStatus == "connected" || SpotifyStatus == "disconnected" ? "passed" : "failed")">
+        @SpotifyStatusMessage
+    </div>
+}
+
+<main class="connections-grid">
+    <section class="service-card spotify-card">
+        <header class="service-heading">
+            <div class="service-icon spotify-icon">●</div>
+            <div><span>Source service</span><h2>Spotify</h2></div>
+            <ConnectionBadge Connected="Credentials.HasSpotifyToken" />
+        </header>
+        @if (Credentials.HasSpotifyToken)
+        {
+            <div class="connected-account">
+                <span class="connected-check">✓</span>
+                <div><strong>@(Credentials.SpotifyDisplayName ?? "Spotify connected")</strong><p>Access tokens refresh automatically for the life of Spotify's refresh token.</p></div>
+            </div>
+            <form method="post" action="/auth/spotify/disconnect">
+                <button class="secondary-action full-width" type="submit">Disconnect Spotify</button>
+            </form>
+        }
+        else
+        {
+            <div class="setup-steps">
+                <div><b>1</b><p>Create or open an app in the <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">Spotify Developer Dashboard ↗</a>.</p></div>
+                <div><b>2</b><p>Add this exact Redirect URI and click <strong>Add</strong>: <code>https://127.0.0.1:7075/auth/spotify/callback</code></p></div>
+                <div><b>3</b><p>Copy the Client ID and Client Secret below, then authorize PlaylistBridge.</p></div>
+            </div>
+            <form method="post" action="/auth/spotify/connect" class="oauth-form">
+                <div>
+                    <label for="spotify-client-id">Client ID</label>
+                    <input id="spotify-client-id" name="clientId" autocomplete="off" placeholder="Spotify Client ID" required />
+                </div>
+                <div>
+                    <label for="spotify-client-secret">Client Secret</label>
+                    <input id="spotify-client-secret" name="clientSecret" type="password" autocomplete="off" placeholder="Spotify Client Secret" required />
+                </div>
+                <button class="spotify-connect" type="submit"><span>●</span> Connect with Spotify</button>
+            </form>
+            <p class="field-help">The secret and refresh token are encrypted locally and are never exposed to client-side code or logs.</p>
+        }
+    </section>
+
+    <section class="service-card youtube-card">
+        <header class="service-heading">
+            <div class="service-icon youtube-icon">▶</div>
+            <div><span>Source & destination</span><h2>YouTube</h2></div>
+            <ConnectionBadge Connected="Credentials.HasYouTubeToken" />
+        </header>
+        <div class="setup-steps">
+            <div><b>1</b><p>Create a free project and enable the <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noreferrer">YouTube Data API v3 ↗</a>.</p></div>
+            <div><b>2</b><p>Configure an OAuth client, then open the <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noreferrer">Google OAuth Playground ↗</a> and enable <strong>Use your own OAuth credentials</strong>.</p></div>
+            <div><b>3</b><p>Authorize <code>https://www.googleapis.com/auth/youtube</code>, exchange the code, and save the refresh token with the same client credentials below.</p></div>
+        </div>
+        <div class="field-stack">
+            <div>
+                <label for="youtube-client-id">OAuth client ID</label>
+                <input id="youtube-client-id" type="password" @bind="Form.YouTubeClientId" autocomplete="off" placeholder="Google OAuth client ID" />
+            </div>
+            <div>
+                <label for="youtube-client-secret">OAuth client secret</label>
+                <input id="youtube-client-secret" type="password" @bind="Form.YouTubeClientSecret" autocomplete="off" placeholder="Google OAuth client secret" />
+            </div>
+            <div>
+                <label for="youtube-refresh-token">OAuth refresh token</label>
+                <input id="youtube-refresh-token" type="password" @bind="Form.YouTubeRefreshToken" autocomplete="off" placeholder="Google OAuth refresh token" />
+            </div>
+            <div>
+                <label for="youtube-token">Access token <span class="optional">(optional)</span></label>
+                <input id="youtube-token" type="password" @bind="Form.YouTubeToken" autocomplete="off" placeholder="Temporary access-token fallback" />
+            </div>
+        </div>
+        <p class="field-help">With all three refresh fields saved, access tokens renew automatically. YouTube API use remains free within Google's default quota.</p>
+    </section>
+
+    <section class="service-card apple-card">
+        <header class="service-heading">
+            <div class="service-icon apple-icon">♪</div>
+            <div><span>Destination service</span><h2>Apple Music</h2></div>
+            <ConnectionBadge Connected="@(Credentials.HasAppleDeveloperToken && Credentials.HasAppleUserToken)" />
+        </header>
+        <div class="setup-steps">
+            <div><b>1</b><p>Enable MusicKit and create a media identifier and private key in <a href="https://developer.apple.com/account/resources/identifiers/list" target="_blank" rel="noreferrer">Certificates, Identifiers & Profiles ↗</a>.</p></div>
+            <div><b>2</b><p>Follow Apple’s <a href="https://developer.apple.com/documentation/applemusicapi/generating-developer-tokens" target="_blank" rel="noreferrer">developer token guide ↗</a> to sign a JWT.</p></div>
+            <div><b>3</b><p>Authorize your subscriber account with MusicKit to receive a <a href="https://developer.apple.com/documentation/applemusicapi/user-authentication-for-musickit" target="_blank" rel="noreferrer">Music User Token ↗</a>.</p></div>
+        </div>
+        <div class="field-stack">
+            <div>
+                <label for="apple-developer-token">Developer token</label>
+                <input id="apple-developer-token" type="password" @bind="Form.AppleDeveloperToken" autocomplete="off" placeholder="Paste signed developer JWT" />
+            </div>
+            <div>
+                <label for="apple-user-token">Music User Token</label>
+                <input id="apple-user-token" type="password" @bind="Form.AppleUserToken" autocomplete="off" placeholder="Paste Music User Token" />
+            </div>
+            <div class="storefront-field">
+                <label for="storefront">Storefront</label>
+                <input id="storefront" @bind="Form.Storefront" maxlength="2" placeholder="us" />
+                <p class="field-help">Two-letter Apple Music storefront code.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="security-card">
+        <div class="shield">◇</div>
+        <div><strong>Encrypted local storage</strong><p>Credentials are encrypted with ASP.NET Core Data Protection for your Windows user. Tokens are never written to logs or browser storage; Spotify uses only a random HTTP-only session identifier in its cookie.</p></div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="connection-message @(MessageIsError ? "failed" : "passed")" role="status">@Message</div>
+    }
+
+    <footer class="connection-actions">
+        <button class="secondary-action" type="button" @onclick="Clear">Clear saved Apple/YouTube</button>
+        <button class="secondary-action" type="button" @onclick="TestAsync" disabled="@(!Credentials.HasAnyCredential || IsTesting)">
+            @(IsTesting ? "Testing…" : "Test connections")
+        </button>
+        <button class="primary-action" type="button" @onclick="Save">Save encrypted connections</button>
+    </footer>
+</main>
+
+@code {
+    [SupplyParameterFromQuery(Name = "spotify")]
+    private string? SpotifyStatus { get; set; }
+
+    private CredentialForm Form { get; } = new();
+    private string? Message { get; set; }
+    private bool MessageIsError { get; set; }
+    private bool IsTesting { get; set; }
+
+    private string SpotifyStatusMessage => SpotifyStatus switch
+    {
+        "connected" => "Spotify connected successfully. Access-token refresh is automatic.",
+        "disconnected" => "Spotify has been disconnected from this session.",
+        "access_denied" => "Spotify authorization was cancelled.",
+        "missing_credentials" => "Enter both the Spotify Client ID and Client Secret.",
+        "state_mismatch" => "Spotify authorization could not be validated. Start the connection again.",
+        "session_expired" => "The Spotify connection attempt expired. Start it again.",
+        _ => "Spotify could not be connected. Check the Client ID, Client Secret, and exact Redirect URI."
+    };
+
+    protected override void OnInitialized() => Form.Storefront = Credentials.Storefront;
+
+    private void Save()
+    {
+        Credentials.Update(
+            null,
+            Form.AppleDeveloperToken,
+            Form.AppleUserToken,
+            Form.YouTubeToken,
+            Form.YouTubeClientId,
+            Form.YouTubeClientSecret,
+            Form.YouTubeRefreshToken,
+            Form.Storefront);
+        Form.ClearSecrets();
+        MessageIsError = false;
+        Message = Credentials.HasYouTubeRefreshToken
+            ? "Connections saved securely. YouTube access tokens will refresh automatically."
+            : "Connections saved securely on this computer.";
+    }
+
+    private void Clear()
+    {
+        Credentials.ClearSavedValues();
+        Form.ClearSecrets();
+        Form.Storefront = Credentials.Storefront;
+        MessageIsError = false;
+        Message = "Saved Apple Music and YouTube credentials cleared. Environment-based credentials, if present, still apply.";
+    }
+
+    private async Task TestAsync()
+    {
+        IsTesting = true;
+        Message = null;
+        try
+        {
+            var results = await TransferFacade.TestConfiguredConnectionsAsync();
+            MessageIsError = results.Any(result => !result.Connected);
+            Message = string.Join(" ", results.Select(result =>
+                $"{ServiceName(result.Service)}: {(result.Connected ? "connected" : $"HTTP {result.StatusCode}")}."));
+        }
+        catch (Exception exception)
+        {
+            MessageIsError = true;
+            Message = $"Connection test failed: {exception.Message}";
+        }
+        finally { IsTesting = false; }
+    }
+
+    private sealed class CredentialForm
+    {
+        public string AppleDeveloperToken { get; set; } = string.Empty;
+        public string AppleUserToken { get; set; } = string.Empty;
+        public string YouTubeToken { get; set; } = string.Empty;
+        public string YouTubeClientId { get; set; } = string.Empty;
+        public string YouTubeClientSecret { get; set; } = string.Empty;
+        public string YouTubeRefreshToken { get; set; } = string.Empty;
+        public string Storefront { get; set; } = "us";
+        public void ClearSecrets() =>
+            (AppleDeveloperToken, AppleUserToken, YouTubeToken, YouTubeClientId, YouTubeClientSecret, YouTubeRefreshToken) =
+            (string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+    }
+
+    private static string ServiceName(MusicService service) => service switch
+    {
+        MusicService.AppleMusic => "Apple Music",
+        _ => service.ToString()
+    };
+}

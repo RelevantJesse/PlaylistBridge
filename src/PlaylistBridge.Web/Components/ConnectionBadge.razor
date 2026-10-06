@@ -1,0 +1,7 @@
+<span class="connection-badge @(Connected ? "connected" : "missing")">
+    <i></i>@(Connected ? "Added" : "Not added")
+</span>
+
+@code {
+    [Parameter] public bool Connected { get; set; }
+}

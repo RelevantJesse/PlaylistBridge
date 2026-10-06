@@ -33,7 +33,7 @@ public sealed class AppleMusicProvider : IMusicProvider
         using var response = await _http.GetAsync(
             $"catalog/{Uri.EscapeDataString(_options.Storefront)}/search?types=songs&limit={Math.Clamp(limit, 1, 25)}&term={term}",
             cancellationToken);
-        response.EnsureSuccessStatusCode();
+        await ProviderHttp.EnsureSuccessAsync(response, Name, "search the catalog", cancellationToken);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(cancellationToken));
         if (!json.RootElement.TryGetProperty("results", out var results) ||
             !results.TryGetProperty("songs", out var songs) ||
@@ -46,7 +46,7 @@ public sealed class AppleMusicProvider : IMusicProvider
     {
         var body = new { attributes = new { name, description = description ?? string.Empty } };
         using var response = await _http.PostAsJsonAsync("me/library/playlists", body, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        await ProviderHttp.EnsureSuccessAsync(response, Name, "create the playlist", cancellationToken);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(cancellationToken));
         return json.RootElement.GetProperty("data")[0].GetProperty("id").GetString()
             ?? throw new InvalidOperationException("Apple Music did not return a playlist id.");
@@ -58,7 +58,7 @@ public sealed class AppleMusicProvider : IMusicProvider
         var body = new { data = trackIds.Select(id => new { id, type = "songs" }).ToArray() };
         using var response = await _http.PostAsJsonAsync(
             $"me/library/playlists/{Uri.EscapeDataString(playlistId)}/tracks", body, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        await ProviderHttp.EnsureSuccessAsync(response, Name, "add tracks to the playlist", cancellationToken);
     }
 
     private static Track ToTrack(JsonElement item)

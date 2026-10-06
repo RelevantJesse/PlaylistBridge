@@ -26,8 +26,11 @@ public sealed record TrackMatch(
 public sealed record TransferResult(
     Playlist Source,
     string? DestinationPlaylistId,
-    IReadOnlyList<TrackMatch> Matches)
+    IReadOnlyList<TrackMatch> Matches,
+    int AddedTrackCount = 0)
 {
     public int MatchedCount => Matches.Count(x => x.IsAccepted);
     public int UnmatchedCount => Matches.Count - MatchedCount;
+    public bool HasStarted => DestinationPlaylistId is not null;
+    public bool IsComplete => HasStarted && AddedTrackCount >= MatchedCount;
 }

@@ -1,0 +1,243 @@
+@page "/"
+@rendermode InteractiveServer
+@inject PlaylistTransferFacade TransferFacade
+
+<PageTitle>PlaylistBridge · Move playlists anywhere</PageTitle>
+
+<section class="hero">
+    <div class="eyebrow"><span></span> Any service → any service</div>
+    <h1>Take your playlists<br /><em>wherever you listen.</em></h1>
+    <p class="hero-copy">Choose where your playlist lives and where it should go. PlaylistBridge finds the right versions, flags uncertain matches, and lets you review everything before it writes.</p>
+</section>
+
+<main class="workspace">
+    <section class="transfer-card">
+        <div class="step-heading">
+            <span class="step-number">01</span>
+            <div>
+                <h2>Choose a playlist</h2>
+                <p>Public, private, and collaborative playlists are supported when your token can access them.</p>
+            </div>
+        </div>
+
+        <div class="service-route">
+            <div>
+                <label for="source-service">From</label>
+                <InputSelect id="source-service" @bind-Value="Input.Source" @bind-Value:after="RouteChanged" disabled="@IsBusy">
+                    @foreach (var service in PlaylistTransferFacade.Sources)
+                    {
+                        <option value="@service.Id">@service.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <span class="route-arrow" aria-hidden="true">→</span>
+            <div>
+                <label for="destination-service">To</label>
+                <InputSelect id="destination-service" @bind-Value="Input.Destination" @bind-Value:after="RouteChanged" disabled="@IsBusy">
+                    @foreach (var service in PlaylistTransferFacade.Destinations)
+                    {
+                        <option value="@service.Id">@service.Name</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        @if (!TransferFacade.IsRouteConfigured(Input.Source, Input.Destination))
+        {
+            <div class="config-notice" role="alert">
+                <div class="notice-icon">!</div>
+                <div>
+                    <strong>Connect your accounts first</strong>
+                    <p>Add the missing credentials on the Connections page before previewing a playlist.</p>
+                    <div class="token-list">
+                        @foreach (var setting in TransferFacade.MissingConfiguration(Input.Source, Input.Destination))
+                        {
+                            <code>@setting</code>
+                        }
+                    </div>
+                    <a class="notice-link" href="connections">Open Connections →</a>
+                </div>
+            </div>
+        }
+
+        <EditForm Model="Input" OnValidSubmit="PreviewAsync" FormName="playlist-transfer">
+            <DataAnnotationsValidator />
+            <label for="playlist-url">@SourceName playlist link or ID</label>
+            <div class="input-row">
+                <div class="url-field">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a2 2 0 0 0 2.8 0l3-3a2 2 0 0 0-2.8-2.8l-1.1 1.1m-1 6.6-1.1 1.1a2 2 0 0 1-2.8-2.8l3-3a2 2 0 0 1 2.8 0" /></svg>
+                    <InputText id="playlist-url" @bind-Value="Input.Playlist" placeholder="@SourceOption.PlaylistPlaceholder" disabled="@IsBusy" />
+                </div>
+                <button class="primary-action" type="submit" disabled="@(!TransferFacade.IsRouteConfigured(Input.Source, Input.Destination) || IsBusy)">
+                    @if (IsPreviewing) { <span class="spinner"></span><span>Matching…</span> }
+                    else { <span>Preview transfer</span><span aria-hidden="true">→</span> }
+                </button>
+            </div>
+            <ValidationMessage For="@(() => Input.Playlist)" />
+        </EditForm>
+
+        <div class="privacy-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+            Credentials stay on this server and are never saved by the app.
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="error-banner" role="alert"><strong>Transfer couldn’t continue.</strong> @ErrorMessage</div>
+    }
+
+    @if (Result is not null)
+    {
+        <section class="results-card">
+            <div class="results-header">
+                <div class="playlist-identity">
+                    <div class="cover-art"><span>♫</span></div>
+                    <div>
+                        <span class="result-label">@(Result.HasStarted ? "Transfer in progress" : "Preview ready")</span>
+                        <h2>@Result.Source.Name</h2>
+                        <p>@Result.Source.Tracks.Count tracks from @SourceName</p>
+                    </div>
+                </div>
+                <div class="match-summary">
+                    <div><strong>@Result.MatchedCount</strong><span>Ready</span></div>
+                    <div><strong>@Result.UnmatchedCount</strong><span>Review</span></div>
+                </div>
+            </div>
+
+            <div class="track-list">
+                @for (var index = 0; index < Result.Matches.Count; index++)
+                {
+                    var match = Result.Matches[index];
+                    <article class="track-row @(match.IsAccepted ? "accepted" : "review")">
+                        <span class="track-index">@(index + 1)</span>
+                        <div class="track-source">
+                            <strong>@match.Source.Title</strong>
+                            <span>@match.Source.Artist</span>
+                        </div>
+                        <span class="bridge-line"></span>
+                        <div class="track-destination">
+                            @if (match.Destination is not null)
+                            {
+                                <strong>@match.Destination.Title</strong>
+                                <span>@match.Destination.Artist</span>
+                            }
+                            else
+                            {
+                                <strong>No match found</strong>
+                                <span>Nothing will be added</span>
+                            }
+                        </div>
+                        <div class="confidence" title="@string.Join(" · ", match.Reasons)">
+                            <span class="status-dot"></span>
+                            <span>@ConfidenceLabel(match)</span>
+                            <small>@match.Score.ToString("0")%</small>
+                        </div>
+                    </article>
+                }
+            </div>
+
+            <footer class="results-footer">
+                <p>
+                    @if (Result.HasStarted)
+                    {
+                        <span>@Result.AddedTrackCount of @Result.MatchedCount matched tracks have been added. </span>
+                    }
+                    else
+                    {
+                        <span>@Result.MatchedCount confident matches will be added. </span>
+                    }
+                    @Result.UnmatchedCount @(Result.UnmatchedCount == 1 ? "track needs" : "tracks need") review and will be skipped.
+                </p>
+                @if (!Result.IsComplete)
+                {
+                    <button class="commit-action" @onclick="CommitAsync" disabled="@(IsBusy || Result.MatchedCount == 0)">
+                        @if (IsCommitting) { <span class="spinner dark"></span><span>@(Result.HasStarted ? "Resuming transfer…" : "Creating playlist…")</span> }
+                        else { <span>@(Result.HasStarted ? $"Resume in {DestinationName}" : $"Create in {DestinationName}")</span><span aria-hidden="true">↗</span> }
+                    </button>
+                }
+                else
+                {
+                    <div class="success-pill"><span>✓</span> Playlist created successfully</div>
+                }
+            </footer>
+        </section>
+    }
+</main>
+
+<section class="how-it-works">
+    <div><span>01</span><strong>Read</strong><p>Playlist metadata is read securely from the source.</p></div>
+    <div><span>02</span><strong>Match</strong><p>ISRC and metadata identify the best catalog version.</p></div>
+    <div><span>03</span><strong>Bridge</strong><p>Only confident matches are added to the destination.</p></div>
+</section>
+
+@code {
+    private PlaylistInput Input { get; } = new();
+    private TransferResult? Result { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool IsPreviewing { get; set; }
+    private bool IsCommitting { get; set; }
+    private bool IsBusy => IsPreviewing || IsCommitting;
+
+    private async Task PreviewAsync()
+    {
+        IsPreviewing = true;
+        ErrorMessage = null;
+        Result = null;
+        try { Result = await TransferFacade.PreviewAsync(Input.Source, Input.Destination, Input.Playlist); }
+        catch (Exception exception) { ErrorMessage = FriendlyMessage(exception); }
+        finally { IsPreviewing = false; }
+    }
+
+    private async Task CommitAsync()
+    {
+        if (Result is null) return;
+        IsCommitting = true;
+        ErrorMessage = null;
+        try { Result = await TransferFacade.CommitAsync(Input.Source, Input.Destination, Result); }
+        catch (PlaylistTransferException exception)
+        {
+            Result = exception.PartialResult;
+            ErrorMessage = FriendlyMessage(exception);
+        }
+        catch (Exception exception) { ErrorMessage = FriendlyMessage(exception); }
+        finally { IsCommitting = false; }
+    }
+
+    private static string ConfidenceLabel(TrackMatch match) => match.Confidence switch
+    {
+        MatchConfidence.Exact => "Exact ISRC",
+        MatchConfidence.High => "High match",
+        MatchConfidence.Medium => "Good match",
+        _ => "Needs review"
+    };
+
+    private static string FriendlyMessage(Exception exception) => exception switch
+    {
+        PlaylistTransferException transfer => transfer.Message,
+        ProviderApiException provider => provider.Message,
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized } => "A provider rejected its token. Refresh the configured credentials and try again.",
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.Forbidden } => "The connected account cannot access this playlist or operation.",
+        _ => exception.Message
+    };
+
+    private MusicServiceOption SourceOption => PlaylistTransferFacade.Services.First(x => x.Id == Input.Source);
+    private string SourceName => SourceOption.Name;
+    private string DestinationName => PlaylistTransferFacade.Services.First(x => x.Id == Input.Destination).Name;
+
+    private void RouteChanged()
+    {
+        Result = null;
+        ErrorMessage = null;
+        Input.Playlist = string.Empty;
+    }
+
+    private sealed class PlaylistInput
+    {
+        public MusicService Source { get; set; } = MusicService.YouTube;
+        public MusicService Destination { get; set; } = MusicService.AppleMusic;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Paste a playlist link or ID.")]
+        public string Playlist { get; set; } = string.Empty;
+    }
+}
